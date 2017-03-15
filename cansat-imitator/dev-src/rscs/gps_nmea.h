@@ -18,7 +18,7 @@ typedef struct rscs_gps_t rscs_gps_t;
 
 // Инициализация GPS, принимает идентификатор UART-а на котором висит GPS приёмник
 // сам открывает UART и настраивает его
-rscs_gps_t * rscs_gps_init_by_uart(rscs_uart_id_t uartId);
+rscs_gps_t * rscs_gps_init(rscs_uart_id_t uartId);
 
 // Деинициализация GPS, вместе c UART, на котором он висит
 void rscs_gps_deinit(rscs_gps_t * gps);
