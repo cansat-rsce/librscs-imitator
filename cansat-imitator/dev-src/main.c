@@ -13,8 +13,8 @@ int main()
 
 	while(1)
 	{
-		float lon, lat, height;
-		rscs_e error = rscs_gps_read(gps, &lon, &lat, &height);
+		float lon, lat, height, hasFix;
+		rscs_e error = rscs_gps_read(gps, &lon, &lat, &height, &hasFix);
 
 		if (error == RSCS_E_NONE)
 			printf("error = %i\n", error);

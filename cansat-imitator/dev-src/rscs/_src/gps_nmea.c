@@ -45,7 +45,10 @@ rscs_gps_t * rscs_gps_init(rscs_uart_id_t uartId)
 	retval->buffer_carret = 0;
 	retval->state = GPS_STATE_IDLE;
 	// настройка UART
-	//rscs_uart_set_baudrate(retval->uart, ...);
+	rscs_uart_set_baudrate(retval->uart, RSCS_GPS_UART_BAUD_RATE);
+	rscs_uart_set_stop_bits(retval->uart, RSCS_GPS_UART_STOP_BITS);
+	rscs_uart_set_parity(retval->uart, RSCS_GPS_UART_PARITY);
+	rscs_uart_set_character_size(retval->uart, 8);
 
 	return retval;
 }
@@ -58,7 +61,23 @@ void rscs_gps_deinit(rscs_gps_t * gps)
 }
 
 
-static bool _handle_message(const char * msg_signed, size_t msgSize, float * lon, float * lat, float * height)
+static int _explode(const char * str, size_t msgSize, char symbol, const char ** results,
+		size_t results_size)
+{
+	uint8_t numbersOfStr = 0;
+	for (int i = 0; i < msgSize; i++){
+		if (str[i] == symbol){
+			results[numbersOfStr] = &str[i + 1];
+			if (numbersOfStr > results_size)
+				return 0;
+			numbersOfStr++;
+		}
+	}
+	return numbersOfStr;
+}
+
+static bool _handle_message(const char * msg_signed, size_t msgSize, float * lon, float * lat,
+						    float * height, bool * hasFix)
 {
 	const uint8_t * msg = (const uint8_t *)msg_signed;
 	char chksum = msg[1]; // пропускаем нулевой символ $
@@ -68,33 +87,47 @@ static bool _handle_message(const char * msg_signed, size_t msgSize, float * lon
 		chksum = chksum ^ msg[i];
 
 	int expectedChksumValue;
-	if (sscanf(msg_signed + chksumLimit+1, "%X", &expectedChksumValue) != 0)
+	if (sscanf(msg_signed + chksumLimit+1, "%X", &expectedChksumValue) == 0)
 		return false;
 
 	if (chksum != expectedChksumValue)
 		return false;
 
-	// разбираем долготу
-	if (sscanf(&msg_signed[18], "%f", lon) != 1)
+	const char * results[16];
+	uint8_t numbersOfStr = _explode(msg_signed, msgSize, ',', results, sizeof(results));
+	if (numbersOfStr == 0)
 		return false;
 
-	if (msg_signed[27] != 'N')
+	// разбираем долготу
+	if (sscanf(results[1], "%f", lon) != 1)
+		return false;
+
+	if(*results[2] != 'N')
 		*lon *= -1;
 
-	if (sscanf(&msg_signed[29], "%f", lat) != 1)
+	//разбираем широту
+	if (sscanf(results[3], "%f", lat) != 1)
 		return false;
 
-	if (msg_signed[39] != 'E')
+	if (*results[4] != 'E')
 		*lat *= -1;
 
-	if (sscanf(&msg_signed[29], "%f", lat) != 1)
+	//разбираем высоту
+	if (sscanf(results[9], "%f", height) != 1)
+		return false;
 
-
+	//проверка качества
+	int fixQual;
+	if (sscanf(results[5], "%i", &fixQual) != 0)
+		*hasFix = false;
+		else
+		*hasFix = true;
 	return true;
 }
 
 
-rscs_e rscs_gps_read(rscs_gps_t * gps, float * lon, float * lat, float * height)
+rscs_e rscs_gps_read(rscs_gps_t * gps, float * lon, float * lat,
+					 float * height, bool * hasFix)
 {
 	// нужно прочитать данные из связанного UART
 	// выкинуть все не нужное, найти нужное сообщение
@@ -152,7 +185,7 @@ again:
 				&& '\n' == gps->buffer[gps->buffer_carret-1]
 			    && '\r' == gps->buffer[gps->buffer_carret-2])
 			{
-				if (_handle_message(gps->buffer, gps->buffer_carret, lon, lat, height))
+				if (_handle_message(gps->buffer, gps->buffer_carret, lon, lat, height, hasFix))
 				{
 					gps->state = GPS_STATE_IDLE;
 					return RSCS_E_NONE;

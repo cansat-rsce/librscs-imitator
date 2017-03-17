@@ -25,7 +25,7 @@ void rscs_gps_deinit(rscs_gps_t * gps);
 
 // чтение накопленных в буфере UART данных, их разбор и выделение из них широты, долготы и высоты
 // если в буфере UART еще не накопилось необходимое сообщение - вернет ошибку RSCS_E_BUSY
-rscs_e rscs_gps_read(rscs_gps_t * gps, float * lon, float * lat, float * height);
+rscs_e rscs_gps_read(rscs_gps_t * gps, float * lon, float * lat, float * height, bool * hasFix);
 
 
 #endif
